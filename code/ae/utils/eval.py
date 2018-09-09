@@ -71,7 +71,7 @@ def do_eval(sess,
   true_count = 0  # Counts the number of correct predictions.
   steps_per_epoch = data_set.num_examples // FLAGS.batch_size
   num_examples = steps_per_epoch * FLAGS.batch_size
-  for step in xrange(steps_per_epoch):
+  for step in range(steps_per_epoch):
     feed_dict = fill_feed_dict(data_set,
                                images_placeholder,
                                labels_placeholder)
@@ -90,7 +90,7 @@ def do_eval_summary(tag,
   true_count = 0
   steps_per_epoch = data_set.num_examples // FLAGS.batch_size
   num_examples = steps_per_epoch * FLAGS.batch_size
-  for step in xrange(steps_per_epoch):
+  for step in range(steps_per_epoch):
     feed_dict = fill_feed_dict(data_set,
                                images_placeholder,
                                labels_placeholder)

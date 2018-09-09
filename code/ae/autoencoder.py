@@ -5,11 +5,12 @@ from os.path import join as pjoin
 
 import numpy as np
 import tensorflow as tf
-from utils.data import fill_feed_dict_ae, read_data_sets_pretraining
-from utils.data import read_data_sets, fill_feed_dict
-from utils.flags import FLAGS
-from utils.eval import loss_supervised, evaluation, do_eval_summary
-from utils.utils import tile_raster_images
+from TensorFlowDeepAutoencoder.code.ae.utils.data import fill_feed_dict_ae, read_data_sets_pretraining
+from TensorFlowDeepAutoencoder.code.ae.utils.data import read_data_sets, fill_feed_dict
+from TensorFlowDeepAutoencoder.code.ae.utils.flags import FLAGS
+from TensorFlowDeepAutoencoder.code.ae.utils.eval import loss_supervised, evaluation, do_eval_summary
+from TensorFlowDeepAutoencoder.code.ae.utils.utils import tile_raster_images
+from TensorFlowDeepAutoencoder.ELM.model import ELM
 
 
 class AutoEncoder(object):
@@ -82,7 +83,7 @@ class AutoEncoder(object):
 
   def _setup_variables(self):
     with tf.name_scope("autoencoder_variables"):
-      for i in xrange(self.__num_hidden_layers + 1):
+      for i in range(self.__num_hidden_layers + 1):
         # Train weights
         name_w = self._weights_str.format(i + 1)
         w_shape = (self.__shape[i], self.__shape[i + 1])
@@ -167,7 +168,7 @@ class AutoEncoder(object):
     assert n <= self.__num_hidden_layers
 
     last_output = input_pl
-    for i in xrange(n - 1):
+    for i in range(n - 1):
       w = self._w(i + 1, "_fixed")
       b = self._b(i + 1, "_fixed")
 
@@ -194,7 +195,7 @@ class AutoEncoder(object):
     """
     last_output = input_pl
 
-    for i in xrange(self.__num_hidden_layers + 1):
+    for i in range(self.__num_hidden_layers + 1):
       # Fine tuning will be done on these variables
       w = self._w(i + 1)
       b = self._b(i + 1)
@@ -271,7 +272,7 @@ def main_unsupervised():
 
     num_hidden = FLAGS.num_hidden_layers
     ae_hidden_shapes = [getattr(FLAGS, "hidden{0}_units".format(j + 1))
-                        for j in xrange(num_hidden)]
+                        for j in range(num_hidden)]
     ae_shape = [FLAGS.image_pixels] + ae_hidden_shapes + [FLAGS.num_classes]
 
     ae = AutoEncoder(ae_shape, sess)
@@ -281,12 +282,12 @@ def main_unsupervised():
 
     learning_rates = {j: getattr(FLAGS,
                                  "pre_layer{0}_learning_rate".format(j + 1))
-                      for j in xrange(num_hidden)}
+                      for j in range(num_hidden)}
 
     noise = {j: getattr(FLAGS, "noise_{0}".format(j + 1))
-             for j in xrange(num_hidden)}
+             for j in range(num_hidden)}
 
-    for i in xrange(len(ae_shape) - 2):
+    for i in range(len(ae_shape) - 2):
       n = i + 1
       with tf.variable_scope("pretrain_{0}".format(n)):
         input_ = tf.placeholder(dtype=tf.float32,
@@ -322,7 +323,7 @@ def main_unsupervised():
         print("| Training Step | Cross Entropy |  Layer  |   Epoch  |")
         print("|---------------|---------------|---------|----------|")
 
-        for step in xrange(FLAGS.pretraining_epochs * num_train):
+        for step in range(FLAGS.pretraining_epochs * num_train):
           feed_dict = fill_feed_dict_ae(data.train, input_, target_, noise[i])
 
           loss_summary, loss_value = sess.run([train_op, loss],
@@ -387,9 +388,9 @@ def main_supervised(ae):
     eval_correct = evaluation(logits, labels_placeholder)
 
     hist_summaries = [ae['biases{0}'.format(i + 1)]
-                      for i in xrange(ae.num_hidden_layers + 1)]
+                      for i in range(ae.num_hidden_layers + 1)]
     hist_summaries.extend([ae['weights{0}'.format(i + 1)]
-                           for i in xrange(ae.num_hidden_layers + 1)])
+                           for i in range(ae.num_hidden_layers + 1)])
 
     hist_summaries = [tf.histogram_summary(v.op.name + "_fine_tuning", v)
                       for v in hist_summaries]
@@ -405,7 +406,7 @@ def main_supervised(ae):
     sess.run(tf.initialize_variables(vars_to_init))
 
     steps = FLAGS.finetuning_epochs * num_train
-    for step in xrange(steps):
+    for step in range(steps):
       start_time = time.time()
 
       feed_dict = fill_feed_dict(data.train,
