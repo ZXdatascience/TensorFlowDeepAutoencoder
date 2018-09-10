@@ -1,9 +1,9 @@
 import os
 import shutil
 
-from ae.utils.flags import FLAGS, home_out
-import ae.autoencoder as autoencoder
-from ae.utils.start_tensorboard import start
+from code.ae.utils.flags import FLAGS, home_out
+import code.ae.autoencoder as autoencoder
+from code.ae.utils.start_tensorboard import start
 
 
 _data_dir = FLAGS.data_dir

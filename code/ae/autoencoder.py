@@ -5,12 +5,12 @@ from os.path import join as pjoin
 
 import numpy as np
 import tensorflow as tf
-from TensorFlowDeepAutoencoder.code.ae.utils.data import fill_feed_dict_ae, read_data_sets_pretraining
-from TensorFlowDeepAutoencoder.code.ae.utils.data import read_data_sets, fill_feed_dict
-from TensorFlowDeepAutoencoder.code.ae.utils.flags import FLAGS
-from TensorFlowDeepAutoencoder.code.ae.utils.eval import loss_supervised, evaluation, do_eval_summary
-from TensorFlowDeepAutoencoder.code.ae.utils.utils import tile_raster_images
-from TensorFlowDeepAutoencoder.ELM.model import ELM
+from code.ae.utils.data import fill_feed_dict_ae, read_data_sets_pretraining
+from code.ae.utils.data import read_data_sets, fill_feed_dict
+from code.ae.utils.flags import FLAGS
+from code.ae.utils.eval import loss_supervised, evaluation, do_eval_summary
+from code.ae.utils.utils import tile_raster_images
+from ELM.model import ELM
 
 
 class AutoEncoder(object):

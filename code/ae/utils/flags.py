@@ -1,49 +1,43 @@
 from __future__ import division
 import os
 from os.path import join as pjoin
-
+from pathlib import Path
 import sys
 
 import tensorflow as tf
 
 
-IMAGE_PIXELS = 28 * 28
-NUM_CLASSES = 10
-
-
 def home_out(path):
-  return pjoin(os.environ['HOME'], 'tmp', 'mnist', path)
+  return pjoin(str(Path.home()), 'tmp', 'SAE', path)
 
 flags = tf.app.flags
 FLAGS = flags.FLAGS
 
+units_each_autoencoder_layer = 50
+units_each_dense_layer = 50
+num_autoencocer_layers = 3
+num_dense_layer = 3
 # Autoencoder Architecture Specific Flags
-flags.DEFINE_integer("num_hidden_layers", 3, "Number of hidden layers")
+flags.DEFINE_integer("num_autoencoder_layers", num_autoencocer_layers, "Number of autoencoder layers")
+flags.DEFINE_integer("num_dense_layers", num_dense_layer, "Number of dense layers")
 
-flags.DEFINE_integer('hidden1_units', 2000,
-                     'Number of units in hidden layer 1.')
-flags.DEFINE_integer('hidden2_units', 2000,
-                     'Number of units in hidden layer 2.')
-flags.DEFINE_integer('hidden3_units', 2000,
-                     'Number of units in hidden layer 3.')
+for i in range(num_autoencocer_layers):
+    flags.DEFINE_integer('autoencoder{}_units'.format(i+1), units_each_autoencoder_layer,
+                         'Number of units in autoencoder layer {}.'.format(i+1))
 
-flags.DEFINE_integer('image_pixels', IMAGE_PIXELS, 'Total number of pixels')
-flags.DEFINE_integer('num_classes', 10, 'Number of classes')
+for i in range(num_dense_layer):
+    flags.DEFINE_integer('dense{}_units'.format(i+1), units_each_dense_layer,
+                         'Number of units in dense layer {}.'.format(i+1))
 
-flags.DEFINE_float('pre_layer1_learning_rate', 0.0001,
-                   'Initial learning rate.')
-flags.DEFINE_float('pre_layer2_learning_rate', 0.0001,
-                   'Initial learning rate.')
-flags.DEFINE_float('pre_layer3_learning_rate', 0.0001,
-                   'Initial learning rate.')
+for i in range(num_autoencocer_layers):
+    flags.DEFINE_float('pre_layer{}_learning_rate'.format(i+1), 0.0001,
+                       'Initial learning rate.')
 
-flags.DEFINE_float('noise_1', 0.50, 'Rate at which to set pixels to 0')
-flags.DEFINE_float('noise_2', 0.50, 'Rate at which to set pixels to 0')
-flags.DEFINE_float('noise_3', 0.50, 'Rate at which to set pixels to 0')
+for i in range(num_autoencocer_layers):
+    flags.DEFINE_float('noise_{}'.format(i+1), 0.50, 'Rate at which to set data to 0')
 
 # Constants
 flags.DEFINE_integer('seed', 1234, 'Random seed')
-flags.DEFINE_integer('image_size', 28, 'Image square size')
 
 flags.DEFINE_integer('batch_size', 100,
                      'Batch size. Must divide evenly into the dataset sizes.')
