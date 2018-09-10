@@ -26,7 +26,7 @@ class AutoEncoder(object):
   _weights_str = "weights{0}"
   _biases_str = "biases{0}"
 
-  def __init__(self, shape, sess):
+  def __init__(self, shape_hidden, shape_dense, input_dim, output_dim, sess):
     """Autoencoder initializer
 
     Args:
@@ -34,8 +34,9 @@ class AutoEncoder(object):
               num input, hidden1 units,...hidden_n units, num logits
       sess: tensorflow session object to use
     """
-    self.__shape = shape  # [input_dim,hidden1_dim,...,hidden_n_dim,output_dim]
-    self.__num_hidden_layers = len(self.__shape) - 2
+    self.__shape = [input_dim] + shape_hidden + shape_dense + [output_dim]
+    self.__num_hidden_layers = len(shape_hidden)
+    self.__num_dense_layers = len(shape_dense)
 
     self.__variables = {}
     self.__sess = sess
@@ -82,8 +83,8 @@ class AutoEncoder(object):
     self.__variables[key] = value
 
   def _setup_variables(self):
-    with tf.name_scope("autoencoder_variables"):
-      for i in range(self.__num_hidden_layers + 1):
+    with tf.name_scope("all_hidden_variables"):
+      for i in range(self.__num_hidden_layers + self.__num_dense_layers + 1):
         # Train weights
         name_w = self._weights_str.format(i + 1)
         w_shape = (self.__shape[i], self.__shape[i + 1])
@@ -117,6 +118,8 @@ class AutoEncoder(object):
                                          trainable=True,
                                          name=name_b_out)
 
+
+
   def _w(self, n, suffix=""):
     return self[self._weights_str.format(n) + suffix]
 
@@ -135,7 +138,7 @@ class AutoEncoder(object):
       n: int giving step of training
     """
     assert n > 0
-    assert n <= self.__num_hidden_layers + 1
+    assert n <= self.__num_hidden_layers + self.__num_dense_layers + 1
 
     vars_to_init = [self._w(n), self._b(n)]
 
@@ -195,7 +198,7 @@ class AutoEncoder(object):
     """
     last_output = input_pl
 
-    for i in range(self.__num_hidden_layers + 1):
+    for i in range(self.__num_hidden_layers + self.__num_dense_layers + 1):
       # Fine tuning will be done on these variables
       w = self._w(i + 1)
       b = self._b(i + 1)
@@ -266,16 +269,22 @@ def loss_x_entropy(output, target):
                                  name='xentropy_mean')
 
 
+def loss_rmse(output, target):
+    return tf.sqrt(tf.reduce_mean(tf.square(tf.subtract(target, output))))
+
+
 def main_unsupervised():
   with tf.Graph().as_default() as g:
     sess = tf.Session()
 
     num_hidden = FLAGS.num_hidden_layers
+    num_dense = FLAGS.num_dense_layers
     ae_hidden_shapes = [getattr(FLAGS, "hidden{0}_units".format(j + 1))
                         for j in range(num_hidden)]
-    ae_shape = [FLAGS.image_pixels] + ae_hidden_shapes + [FLAGS.num_classes]
+    ae_dense_shapes = [getattr(FLAGS, "dense{0}_units".format(j + 1))
+                        for j in range(num_hidden)]
 
-    ae = AutoEncoder(ae_shape, sess)
+    ae = AutoEncoder(ae_hidden_shapes, ae_dense_shapes, FLAGS.input_dim, FLAGS.output_dim, sess)
 
     data = read_data_sets_pretraining(FLAGS.data_dir)
     num_train = data.train.num_examples

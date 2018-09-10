@@ -13,30 +13,34 @@ def home_out(path):
 flags = tf.app.flags
 FLAGS = flags.FLAGS
 
-units_each_autoencoder_layer = 50
+units_each_hidden_layer = 50
 units_each_dense_layer = 50
-num_autoencocer_layers = 3
+num_hidden_layers = 3
 num_dense_layer = 3
 # Autoencoder Architecture Specific Flags
-flags.DEFINE_integer("num_autoencoder_layers", num_autoencocer_layers, "Number of autoencoder layers")
+flags.DEFINE_integer("num_hidden_layers", num_hidden_layers, "Number of hidden autoencoder layers")
 flags.DEFINE_integer("num_dense_layers", num_dense_layer, "Number of dense layers")
 
-for i in range(num_autoencocer_layers):
-    flags.DEFINE_integer('autoencoder{}_units'.format(i+1), units_each_autoencoder_layer,
+for i in range(num_hidden_layers):
+    flags.DEFINE_integer('hidden{}_units'.format(i+1), units_each_hidden_layer,
                          'Number of units in autoencoder layer {}.'.format(i+1))
 
 for i in range(num_dense_layer):
     flags.DEFINE_integer('dense{}_units'.format(i+1), units_each_dense_layer,
                          'Number of units in dense layer {}.'.format(i+1))
 
-for i in range(num_autoencocer_layers):
+for i in range(num_hidden_layers):
     flags.DEFINE_float('pre_layer{}_learning_rate'.format(i+1), 0.0001,
                        'Initial learning rate.')
 
-for i in range(num_autoencocer_layers):
+for i in range(num_hidden_layers):
     flags.DEFINE_float('noise_{}'.format(i+1), 0.50, 'Rate at which to set data to 0')
 
 # Constants
+flags.DEFINE_integer('input_dim', 3, 'Input dimension')
+
+flags.DEFINE_integer('output_dim', 3, 'Output dimension')
+
 flags.DEFINE_integer('seed', 1234, 'Random seed')
 
 flags.DEFINE_integer('batch_size', 100,
