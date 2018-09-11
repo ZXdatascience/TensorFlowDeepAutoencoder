@@ -282,12 +282,12 @@ def main_unsupervised():
     ae_hidden_shapes = [getattr(FLAGS, "hidden{0}_units".format(j + 1))
                         for j in range(num_hidden)]
     ae_dense_shapes = [getattr(FLAGS, "dense{0}_units".format(j + 1))
-                        for j in range(num_hidden)]
+                        for j in range(num_dense)]
 
     ae = AutoEncoder(ae_hidden_shapes, ae_dense_shapes, FLAGS.input_dim, FLAGS.output_dim, sess)
 
-    data = read_data_sets_pretraining(FLAGS.data_dir)
-    num_train = data.train.num_examples
+    data = np.random.randn([100, FLAGS.input_dim])
+    num_train = 100
 
     learning_rates = {j: getattr(FLAGS,
                                  "pre_layer{0}_learning_rate".format(j + 1))
@@ -296,14 +296,14 @@ def main_unsupervised():
     noise = {j: getattr(FLAGS, "noise_{0}".format(j + 1))
              for j in range(num_hidden)}
 
-    for i in range(len(ae_shape) - 2):
+    for i in range(len(ae_hidden_shapes)):
       n = i + 1
       with tf.variable_scope("pretrain_{0}".format(n)):
         input_ = tf.placeholder(dtype=tf.float32,
-                                shape=(FLAGS.batch_size, ae_shape[0]),
+                                shape=(FLAGS.batch_size, FLAGS.input_dim),
                                 name='ae_input_pl')
         target_ = tf.placeholder(dtype=tf.float32,
-                                 shape=(FLAGS.batch_size, ae_shape[0]),
+                                 shape=(FLAGS.batch_size, FLAGS.input_dim),
                                  name='ae_target_pl')
         layer = ae.pretrain_net(input_, n)
 
