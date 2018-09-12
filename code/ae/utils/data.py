@@ -5,10 +5,10 @@ from __future__ import print_function
 import gzip
 
 import numpy
-
+import tensorflow as tf
 from six.moves import urllib
 from six.moves import range  # pylint: disable=redefined-builtin
-from code.ae.utils.flags import FLAGS
+from TensorFlowDeepAutoencoder.code.ae.utils.flags import FLAGS
 import os
 SOURCE_URL = 'http://yann.lecun.com/exdb/mnist/'
 
@@ -294,3 +294,16 @@ def fill_feed_dict(data_set, images_pl, labels_pl, noise=False):
       labels_pl: labels_feed,
   }
   return feed_dict
+
+if __name__ == '__main__':
+    data = DataSetPreTraining(numpy.random.randn(300, 50, 50, 1) * 1000)
+    input_ = tf.placeholder(dtype=tf.float32,
+                            shape=(FLAGS.batch_size, FLAGS.input_dim),
+                            name='ae_input_pl')
+    target_ = tf.placeholder(dtype=tf.float32,
+                             shape=(FLAGS.batch_size, FLAGS.input_dim),
+                             name='ae_target_pl')
+    noise = {j: getattr(FLAGS, "noise_{0}".format(j + 1))
+             for j in range(1)}
+
+    print(fill_feed_dict_ae(data, input_, target_, noise[0]))

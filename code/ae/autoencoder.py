@@ -5,12 +5,12 @@ from os.path import join as pjoin
 
 import numpy as np
 import tensorflow as tf
-from code.ae.utils.data import fill_feed_dict_ae, read_data_sets_pretraining
-from code.ae.utils.data import read_data_sets, fill_feed_dict
-from code.ae.utils.flags import FLAGS
-from code.ae.utils.eval import loss_supervised, evaluation, do_eval_summary
-from code.ae.utils.utils import tile_raster_images
-from ELM.model import ELM
+from TensorFlowDeepAutoencoder.code.ae.utils.data import fill_feed_dict_ae, read_data_sets_pretraining
+from TensorFlowDeepAutoencoder.code.ae.utils.data import read_data_sets, fill_feed_dict, DataSetPreTraining
+from TensorFlowDeepAutoencoder.code.ae.utils.flags import FLAGS
+from TensorFlowDeepAutoencoder.code.ae.utils.eval import loss_supervised, evaluation, do_eval_summary
+from TensorFlowDeepAutoencoder.code.ae.utils.utils import tile_raster_images
+from TensorFlowDeepAutoencoder.ELM.model import ELM
 
 
 class AutoEncoder(object):
@@ -88,7 +88,7 @@ class AutoEncoder(object):
         # Train weights
         name_w = self._weights_str.format(i + 1)
         w_shape = (self.__shape[i], self.__shape[i + 1])
-        a = tf.mul(4.0, tf.sqrt(6.0 / (w_shape[0] + w_shape[1])))
+        a = tf.multiply(4.0, tf.sqrt(6.0 / (w_shape[0] + w_shape[1])))
         w_init = tf.random_uniform(w_shape, -1 * a, a)
         self[name_w] = tf.Variable(w_init,
                                    name=name_w,
@@ -232,9 +232,9 @@ def training(loss, learning_rate, loss_key=None):
   """
   if loss_key is not None:
     # Add a scalar summary for the snapshot loss.
-    loss_summaries[loss_key] = tf.scalar_summary(loss.op.name, loss)
+    loss_summaries[loss_key] = tf.summary.scalar(loss.op.name, loss)
   else:
-    tf.scalar_summary(loss.op.name, loss)
+    tf.summary.scalar(loss.op.name, loss)
     for var in tf.trainable_variables():
       tf.histogram_summary(var.op.name, var)
   # Create the gradient descent optimizer with the given learning rate.
@@ -261,9 +261,9 @@ def loss_x_entropy(output, target):
   with tf.name_scope("xentropy_loss"):
       net_output_tf = tf.convert_to_tensor(output, name='input')
       target_tf = tf.convert_to_tensor(target, name='target')
-      cross_entropy = tf.add(tf.mul(tf.log(net_output_tf, name='log_output'),
+      cross_entropy = tf.add(tf.multiply(tf.log(net_output_tf, name='log_output'),
                                     target_tf),
-                             tf.mul(tf.log(1 - net_output_tf),
+                             tf.multiply(tf.log(1 - net_output_tf),
                                     (1 - target_tf)))
       return -1 * tf.reduce_mean(tf.reduce_sum(cross_entropy, 1),
                                  name='xentropy_mean')
@@ -286,8 +286,8 @@ def main_unsupervised():
 
     ae = AutoEncoder(ae_hidden_shapes, ae_dense_shapes, FLAGS.input_dim, FLAGS.output_dim, sess)
 
-    data = np.random.randn([100, FLAGS.input_dim])
-    num_train = 100
+    data = DataSetPreTraining(np.random.randn(300, 50, 50, 1) * 1000)
+    num_train = 10
 
     learning_rates = {j: getattr(FLAGS,
                                  "pre_layer{0}_learning_rate".format(j + 1))
@@ -314,15 +314,15 @@ def main_unsupervised():
         train_op, global_step = training(loss, learning_rates[i], i)
 
         summary_dir = pjoin(FLAGS.summary_dir, 'pretraining_{0}'.format(n))
-        summary_writer = tf.train.SummaryWriter(summary_dir,
-                                                graph_def=sess.graph_def,
-                                                flush_secs=FLAGS.flush_secs)
+        summary_writer = tf.summary.FileWriter(summary_dir,
+                                               graph_def=sess.graph_def,
+                                               flush_secs=FLAGS.flush_secs)
         summary_vars = [ae["biases{0}".format(n)], ae["weights{0}".format(n)]]
 
-        hist_summarries = [tf.histogram_summary(v.op.name, v)
+        hist_summarries = [tf.summary.histogram(v.op.name, v)
                            for v in summary_vars]
         hist_summarries.append(loss_summaries[i])
-        summary_op = tf.merge_summary(hist_summarries)
+        summary_op = tf.summary.merge(hist_summarries)
 
         vars_to_init = ae.get_variables_to_init(n)
         vars_to_init.append(global_step)
@@ -333,7 +333,7 @@ def main_unsupervised():
         print("|---------------|---------------|---------|----------|")
 
         for step in range(FLAGS.pretraining_epochs * num_train):
-          feed_dict = fill_feed_dict_ae(data.train, input_, target_, noise[i])
+          feed_dict = fill_feed_dict_ae(data, input_, target_, noise[i])
 
           loss_summary, loss_value = sess.run([train_op, loss],
                                               feed_dict=feed_dict)
@@ -342,12 +342,12 @@ def main_unsupervised():
             summary_str = sess.run(summary_op, feed_dict=feed_dict)
             summary_writer.add_summary(summary_str, step)
             image_summary_op = \
-                tf.image_summary("training_images",
+                tf.summary.image("training_images",
                                  tf.reshape(input_,
                                             (FLAGS.batch_size,
                                              FLAGS.image_size,
                                              FLAGS.image_size, 1)),
-                                 max_images=FLAGS.batch_size)
+                                 max_outputs=FLAGS.batch_size)
 
             summary_img_str = sess.run(image_summary_op,
                                        feed_dict=feed_dict)
@@ -474,4 +474,3 @@ def main_supervised(ae):
 
 if __name__ == '__main__':
   ae = main_unsupervised()
-  main_supervised(ae)

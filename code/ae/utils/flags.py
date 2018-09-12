@@ -37,7 +37,9 @@ for i in range(num_hidden_layers):
     flags.DEFINE_float('noise_{}'.format(i+1), 0.50, 'Rate at which to set data to 0')
 
 # Constants
-flags.DEFINE_integer('input_dim', 3, 'Input dimension')
+flags.DEFINE_integer('image_size', 50, 'Image square size')
+
+flags.DEFINE_integer('input_dim', 50 * 50, 'Input dimension')
 
 flags.DEFINE_integer('output_dim', 3, 'Output dimension')
 
