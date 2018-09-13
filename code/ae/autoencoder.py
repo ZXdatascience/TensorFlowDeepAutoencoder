@@ -6,7 +6,7 @@ from os.path import join as pjoin
 import numpy as np
 import tensorflow as tf
 from TensorFlowDeepAutoencoder.code.ae.utils.data import fill_feed_dict_ae, read_data_sets_pretraining
-from TensorFlowDeepAutoencoder.code.ae.utils.data import read_data_sets, fill_feed_dict, DataSetPreTraining
+from TensorFlowDeepAutoencoder.code.ae.utils.data import read_data_sets, fill_feed_dict, DataSetPreTraining, DataSet
 from TensorFlowDeepAutoencoder.code.ae.utils.flags import FLAGS
 from TensorFlowDeepAutoencoder.code.ae.utils.eval import loss_supervised, evaluation, do_eval_summary
 from TensorFlowDeepAutoencoder.code.ae.utils.utils import tile_raster_images
@@ -50,6 +50,10 @@ class AutoEncoder(object):
   @property
   def num_hidden_layers(self):
     return self.__num_hidden_layers
+
+  @property
+  def num_dense_layers(self):
+    return self.__num_dense_layers
 
   @property
   def session(self):
@@ -204,7 +208,7 @@ class AutoEncoder(object):
       b = self._b(i + 1)
 
       last_output = self._activate(last_output, w, b)
-
+    print(w.shape)
     return last_output
 
 
@@ -236,7 +240,7 @@ def training(loss, learning_rate, loss_key=None):
   else:
     tf.summary.scalar(loss.op.name, loss)
     for var in tf.trainable_variables():
-      tf.histogram_summary(var.op.name, var)
+      tf.summary.histogram(var.op.name, var)
   # Create the gradient descent optimizer with the given learning rate.
   optimizer = tf.train.GradientDescentOptimizer(learning_rate)
   # Create a variable to track the global step.
@@ -369,7 +373,7 @@ def main_unsupervised():
         image_var = tf.Variable(filters)
         image_filter = tf.identity(image_var)
         sess.run(tf.initialize_variables([image_var]))
-        img_filter_summary_op = tf.image_summary("first_layer_filters",
+        img_filter_summary_op = tf.summary.image("first_layer_filters",
                                                  image_filter)
         summary_writer.add_summary(sess.run(img_filter_summary_op))
         summary_writer.flush()
@@ -381,36 +385,37 @@ def main_supervised(ae):
   with ae.session.graph.as_default():
     sess = ae.session
     input_pl = tf.placeholder(tf.float32, shape=(FLAGS.batch_size,
-                                                 FLAGS.image_pixels),
+                                                 FLAGS.input_dim),
                               name='input_pl')
     logits = ae.supervised_net(input_pl)
 
-    data = read_data_sets(FLAGS.data_dir)
+    data = read_data_sets()
     num_train = data.train.num_examples
 
-    labels_placeholder = tf.placeholder(tf.int32,
+    labels_placeholder = tf.placeholder(tf.float32,
                                         shape=FLAGS.batch_size,
                                         name='target_pl')
 
-    loss = loss_supervised(logits, labels_placeholder)
+    loss = loss_rmse(logits, labels_placeholder)
     train_op, global_step = training(loss, FLAGS.supervised_learning_rate)
-    eval_correct = evaluation(logits, labels_placeholder)
+    eval_correct = loss_rmse(logits, labels_placeholder)
 
     hist_summaries = [ae['biases{0}'.format(i + 1)]
                       for i in range(ae.num_hidden_layers + 1)]
     hist_summaries.extend([ae['weights{0}'.format(i + 1)]
                            for i in range(ae.num_hidden_layers + 1)])
 
-    hist_summaries = [tf.histogram_summary(v.op.name + "_fine_tuning", v)
+    hist_summaries = [tf.summary.histogram(v.op.name + "_fine_tuning", v)
                       for v in hist_summaries]
-    summary_op = tf.merge_summary(hist_summaries)
+    summary_op = tf.summary.merge(hist_summaries)
 
-    summary_writer = tf.train.SummaryWriter(pjoin(FLAGS.summary_dir,
-                                                  'fine_tuning'),
-                                            graph_def=sess.graph_def,
-                                            flush_secs=FLAGS.flush_secs)
-
-    vars_to_init = ae.get_variables_to_init(ae.num_hidden_layers + 1)
+    summary_writer = tf.summary.FileWriter(pjoin(FLAGS.summary_dir,
+                                                 'fine_tuning'),
+                                           graph_def=sess.graph_def,
+                                           flush_secs=FLAGS.flush_secs)
+    vars_to_init = []
+    for i in range(ae.num_dense_layers + 1):
+      vars_to_init.extend(ae.get_variables_to_init(ae.num_hidden_layers + i + 1))
     vars_to_init.append(global_step)
     sess.run(tf.initialize_variables(vars_to_init))
 
@@ -431,20 +436,20 @@ def main_supervised(ae):
       if step % 100 == 0:
         # Print status to stdout.
         print('Step %d: loss = %.2f (%.3f sec)' % (step, loss_value, duration))
-        # Update the events file.
-
-        summary_str = sess.run(summary_op, feed_dict=feed_dict)
-        summary_writer.add_summary(summary_str, step)
-        summary_img_str = sess.run(
-            tf.image_summary("training_images",
-                             tf.reshape(input_pl,
-                                        (FLAGS.batch_size,
-                                         FLAGS.image_size,
-                                         FLAGS.image_size, 1)),
-                             max_images=FLAGS.batch_size),
-            feed_dict=feed_dict
-        )
-        summary_writer.add_summary(summary_img_str)
+      #   # Update the events file.
+      #
+      #   summary_str = sess.run(summary_op, feed_dict=feed_dict)
+      #   summary_writer.add_summary(summary_str, step)
+      #   summary_img_str = sess.run(
+      #       tf.summary.image("training_images",
+      #                        tf.reshape(input_pl,
+      #                                   (FLAGS.batch_size,
+      #                                    FLAGS.input_dim,
+      #                                    FLAGS.input_dim, 1)),
+      #                        max_images=FLAGS.batch_size),
+      #       feed_dict=feed_dict
+      #   )
+      #   summary_writer.add_summary(summary_img_str)
 
       if (step + 1) % 1000 == 0 or (step + 1) == steps:
         train_sum = do_eval_summary("training_error",
@@ -474,3 +479,4 @@ def main_supervised(ae):
 
 if __name__ == '__main__':
   ae = main_unsupervised()
+  main_supervised(ae)

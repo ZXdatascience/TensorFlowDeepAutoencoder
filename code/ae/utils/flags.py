@@ -41,7 +41,7 @@ flags.DEFINE_integer('image_size', 50, 'Image square size')
 
 flags.DEFINE_integer('input_dim', 50 * 50, 'Input dimension')
 
-flags.DEFINE_integer('output_dim', 3, 'Output dimension')
+flags.DEFINE_integer('output_dim', 1, 'Output dimension')
 
 flags.DEFINE_integer('seed', 1234, 'Random seed')
 
@@ -51,7 +51,7 @@ flags.DEFINE_integer('batch_size', 100,
 flags.DEFINE_float('supervised_learning_rate', 0.1,
                    'Supervised initial learning rate.')
 
-flags.DEFINE_integer('pretraining_epochs', 60,
+flags.DEFINE_integer('pretraining_epochs', 1,
                      "Number of training epochs for pretraining layers")
 flags.DEFINE_integer('finetuning_epochs', 56,
                      "Number of training epochs for "

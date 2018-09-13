@@ -96,4 +96,4 @@ def do_eval_summary(tag,
                                labels_placeholder)
     true_count += sess.run(eval_correct, feed_dict=feed_dict)
   error = 1 - true_count / num_examples
-  return sess.run(tf.scalar_summary(tag, tf.identity(error)))
+  return sess.run(tf.summary.scalar(tag, tf.identity(error)))
