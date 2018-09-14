@@ -8,7 +8,7 @@ import numpy
 import tensorflow as tf
 from six.moves import urllib
 from six.moves import range  # pylint: disable=redefined-builtin
-from TensorFlowDeepAutoencoder.code.ae.utils.flags import FLAGS
+from code.ae.utils.flags import FLAGS
 import os
 SOURCE_URL = 'http://yann.lecun.com/exdb/mnist/'
 

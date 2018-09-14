@@ -5,12 +5,12 @@ from os.path import join as pjoin
 
 import numpy as np
 import tensorflow as tf
-from TensorFlowDeepAutoencoder.code.ae.utils.data import fill_feed_dict_ae, read_data_sets_pretraining
-from TensorFlowDeepAutoencoder.code.ae.utils.data import read_data_sets, fill_feed_dict, DataSetPreTraining, DataSet
-from TensorFlowDeepAutoencoder.code.ae.utils.flags import FLAGS
-from TensorFlowDeepAutoencoder.code.ae.utils.eval import loss_supervised, evaluation, do_eval_summary
-from TensorFlowDeepAutoencoder.code.ae.utils.utils import tile_raster_images
-from TensorFlowDeepAutoencoder.ELM.model import ELM
+from code.ae.utils.data import fill_feed_dict_ae, read_data_sets_pretraining
+from code.ae.utils.data import read_data_sets, fill_feed_dict, DataSetPreTraining
+from code.ae.utils.flags import FLAGS
+from code.ae.utils.eval import loss_supervised, evaluation, do_eval_summary
+from code.ae.utils.utils import tile_raster_images
+from ELM.model import ELM
 
 
 class AutoEncoder(object):
@@ -330,7 +330,7 @@ def main_unsupervised():
 
         vars_to_init = ae.get_variables_to_init(n)
         vars_to_init.append(global_step)
-        sess.run(tf.initialize_variables(vars_to_init))
+        sess.run(tf.variables_initializer(vars_to_init))
 
         print("\n\n")
         print("| Training Step | Cross Entropy |  Layer  |   Epoch  |")
@@ -372,7 +372,7 @@ def main_unsupervised():
         filters = np.expand_dims(np.expand_dims(filters, 0), 3)
         image_var = tf.Variable(filters)
         image_filter = tf.identity(image_var)
-        sess.run(tf.initialize_variables([image_var]))
+        sess.run(tf.variables_initializer([image_var]))
         img_filter_summary_op = tf.summary.image("first_layer_filters",
                                                  image_filter)
         summary_writer.add_summary(sess.run(img_filter_summary_op))
@@ -417,7 +417,7 @@ def main_supervised(ae):
     for i in range(ae.num_dense_layers + 1):
       vars_to_init.extend(ae.get_variables_to_init(ae.num_hidden_layers + i + 1))
     vars_to_init.append(global_step)
-    sess.run(tf.initialize_variables(vars_to_init))
+    sess.run(tf.variables_initializer(vars_to_init))
 
     steps = FLAGS.finetuning_epochs * num_train
     for step in range(steps):

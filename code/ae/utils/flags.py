@@ -45,7 +45,7 @@ flags.DEFINE_integer('output_dim', 1, 'Output dimension')
 
 flags.DEFINE_integer('seed', 1234, 'Random seed')
 
-flags.DEFINE_integer('batch_size', 100,
+flags.DEFINE_integer('batch_size', 30,
                      'Batch size. Must divide evenly into the dataset sizes.')
 
 flags.DEFINE_float('supervised_learning_rate', 0.1,

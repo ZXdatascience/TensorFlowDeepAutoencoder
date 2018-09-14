@@ -1,8 +1,8 @@
 from __future__ import division
 from __future__ import print_function
 
-from TensorFlowDeepAutoencoder.code.ae.utils.flags import *
-from TensorFlowDeepAutoencoder.code.ae.utils.data import fill_feed_dict as fill_feed_dict
+from code.ae.utils.flags import *
+from code.ae.utils.data import fill_feed_dict as fill_feed_dict
 
 
 def loss_supervised(logits, labels):
