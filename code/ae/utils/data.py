@@ -5,10 +5,11 @@ from __future__ import print_function
 import gzip
 
 import numpy
-import tensorflow as tf
+from statsmodels.tsa.stattools import pacf
 from six.moves import urllib
 from six.moves import range  # pylint: disable=redefined-builtin
 from code.ae.utils.flags import FLAGS
+import pandas as pd
 import os
 SOURCE_URL = 'http://yann.lecun.com/exdb/mnist/'
 
@@ -76,31 +77,30 @@ def extract_labels(filename, one_hot=False):
 
 class DataSet(object):
 
-  def __init__(self, images, labels, fake_data=False):
+  def __init__(self, data, labels, fake_data=False):
     if fake_data:
       self._num_examples = 10000
     else:
-      assert images.shape[0] == labels.shape[0], (
-          "images.shape: %s labels.shape: %s" % (images.shape,
+      assert data.shape[0] == labels.shape[0], (
+          "images.shape: %s labels.shape: %s" % (data.shape,
                                                  labels.shape))
-      self._num_examples = images.shape[0]
+      self._num_examples = data.shape[0]
 
       # Convert shape from [num examples, rows, columns, depth]
       # to [num examples, rows*columns] (assuming depth == 1)
-      assert images.shape[3] == 1
-      images = images.reshape(images.shape[0],
-                              images.shape[1] * images.shape[2])
+      assert data.shape[3] == 1
+      data = data.reshape(data.shape[0],
+                              data.shape[1] * data.shape[2])
       # Convert from [0, 255] -> [0.0, 1.0].
-      images = images.astype(numpy.float32)
-      images = numpy.multiply(images, 1.0 / 255.0)
-    self._images = images
+      data = data.astype(numpy.float32)
+    self._data = data
     self._labels = labels
     self._epochs_completed = 0
     self._index_in_epoch = 0
 
   @property
-  def images(self):
-    return self._images
+  def data(self):
+    return self._data
 
   @property
   def labels(self):
@@ -124,7 +124,7 @@ class DataSet(object):
       # Shuffle the data
       perm = numpy.arange(self._num_examples)
       numpy.random.shuffle(perm)
-      self._images = self._images[perm]
+      self._data = self._data[perm]
       self._labels = self._labels[perm]
       # Start next epoch
       start = 0
@@ -185,14 +185,36 @@ class DataSetPreTraining(object):
     return self._images[start:end], self._images[start:end]
 
 
-def read_data_sets(fake_data=False, one_hot=False):
+def add_lost_data():
+
+
+def add_lag():
+
+
+def read_data_sets(train_dir, fake_data=False, one_hot=False):
   class DataSets(object):
     pass
   data_sets = DataSets()
+  train_data_name = 'building1retail.csv'
+  df = pd.read_csv(train_dir + train_data_name)
 
-  data_sets.train = DataSet(numpy.random.randn(300, 50, 50, 1), numpy.random.randn(300))
-  data_sets.validation = DataSet(numpy.random.randn(30, 50, 50, 1), numpy.random.randn(30))
-  data_sets.test = DataSet(numpy.random.randn(30, 50, 50, 1), numpy.random.randn(30))
+  df['Power (kW)'] =
+  df = add_lost_data(df)
+  electricity_cons = df['Power (kW)'].values
+  data, labels = add_lag(electricity_cons)
+  train_ratio = 0.7
+  validation_ratio = 0.2
+  test_ratio = 0.1
+  train_data = data[:train_ratio * len(data)]
+  train_labels = labels[:train_ratio * len(data)]
+  validation_data = data[train_ratio * len(data): (train_ratio + validation_ratio) * len(data)]
+  validation_labels = labels[train_ratio * len(data): (train_ratio + validation_ratio) * len(data)]
+  test_data = data[(1 - test_ratio) * len(data):]
+  test_labels = labels[(1 - test_ratio) * len(data):]
+
+  data_sets.train = DataSet(train_data, train_labels)
+  data_sets.validation = DataSet(validation_data, validation_labels)
+  data_sets.test = DataSet(test_data, test_labels)
 
   return data_sets
 
@@ -267,14 +289,14 @@ def fill_feed_dict(data_set, images_pl, labels_pl, noise=False):
   return feed_dict
 
 if __name__ == '__main__':
-    data = DataSetPreTraining(numpy.random.randn(300, 50, 50, 1) * 1000)
-    input_ = tf.placeholder(dtype=tf.float32,
-                            shape=(FLAGS.batch_size, FLAGS.input_dim),
-                            name='ae_input_pl')
-    target_ = tf.placeholder(dtype=tf.float32,
-                             shape=(FLAGS.batch_size, FLAGS.input_dim),
-                             name='ae_target_pl')
-    noise = {j: getattr(FLAGS, "noise_{0}".format(j + 1))
-             for j in range(1)}
-
-    print(fill_feed_dict_ae(data, input_, target_, noise[0]))
+    # data = DataSetPreTraining(numpy.random.randn(300, 50, 50, 1) * 1000)
+    # input_ = tf.placeholder(dtype=tf.float32,
+    #                         shape=(FLAGS.batch_size, FLAGS.input_dim),
+    #                         name='ae_input_pl')
+    # target_ = tf.placeholder(dtype=tf.float32,
+    #                          shape=(FLAGS.batch_size, FLAGS.input_dim),
+    #                          name='ae_target_pl')
+    # noise = {j: getattr(FLAGS, "noise_{0}".format(j + 1))
+    #          for j in range(1)}
+    #
+    # print(fill_feed_dict_ae(data, input_, target_, noise[0]))
