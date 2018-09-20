@@ -8,71 +8,12 @@ import numpy
 from statsmodels.tsa.stattools import pacf
 from six.moves import urllib
 from six.moves import range  # pylint: disable=redefined-builtin
-from code.ae.utils.flags import FLAGS
+from TensorFlowDeepAutoencoder.code.ae.utils.flags import FLAGS
+import tensorflow as tf
 import pandas as pd
+import numpy as np
 import os
 SOURCE_URL = 'http://yann.lecun.com/exdb/mnist/'
-
-
-def maybe_download(filename, work_directory):
-  """Download the data from Yann's website, unless it's already here."""
-  if not os.path.exists(work_directory):
-    os.mkdir(work_directory)
-  filepath = os.path.join(work_directory, filename)
-  if not os.path.exists(filepath):
-    filepath, _ = urllib.request.urlretrieve(SOURCE_URL + filename, filepath)
-    statinfo = os.stat(filepath)
-    print('Succesfully downloaded', filename, statinfo.st_size, 'bytes.')
-  return filepath
-
-
-def _read32(bytestream):
-  dt = numpy.dtype(numpy.uint32).newbyteorder('>')
-  return numpy.frombuffer(bytestream.read(4), dtype=dt)
-
-
-def extract_images(filename):
-  """Extract the images into a 4D uint8 numpy array [index, y, x, depth]."""
-  print('\nExtracting', filename)
-  with gzip.open(filename) as bytestream:
-    magic = _read32(bytestream)
-    if magic != 2051:
-      raise ValueError(
-          'Invalid magic number %d in MNIST image file: %s' %
-          (magic, filename))
-    num_images = _read32(bytestream)
-    rows = _read32(bytestream)
-    cols = _read32(bytestream)
-    buf = bytestream.read(rows * cols * num_images)
-    data = numpy.frombuffer(buf, dtype=numpy.uint8)
-    data = data.reshape(num_images, rows, cols, 1)
-    return data
-
-
-def dense_to_one_hot(labels_dense, num_classes=10):
-  """Convert class labels from scalars to one-hot vectors."""
-  num_labels = labels_dense.shape[0]
-  index_offset = numpy.arange(num_labels) * num_classes
-  labels_one_hot = numpy.zeros((num_labels, num_classes))
-  labels_one_hot.flat[index_offset + labels_dense.ravel()] = 1
-  return labels_one_hot
-
-
-def extract_labels(filename, one_hot=False):
-  """Extract the labels into a 1D uint8 numpy array [index]."""
-  print('Extracting', filename)
-  with gzip.open(filename) as bytestream:
-    magic = _read32(bytestream)
-    if magic != 2049:
-      raise ValueError(
-          'Invalid magic number %d in MNIST label file: %s' %
-          (magic, filename))
-    num_items = _read32(bytestream)
-    buf = bytestream.read(num_items)
-    labels = numpy.frombuffer(buf, dtype=numpy.uint8)
-    if one_hot:
-      return dense_to_one_hot(labels)
-    return labels
 
 
 class DataSet(object):
@@ -136,26 +77,23 @@ class DataSet(object):
 
 class DataSetPreTraining(object):
 
-  def __init__(self, images):
-    self._num_examples = images.shape[0]
+  def __init__(self, data):
+    self._num_examples = data.shape[0]
 
     # Convert shape from [num examples, rows, columns, depth]
     # to [num examples, rows*columns] (assuming depth == 1)
-    assert images.shape[3] == 1
-    images = images.reshape(images.shape[0],
-                            images.shape[1] * images.shape[2])
+    assert data.shape[3] == 1
+    data = data.reshape(data.shape[0],
+                        data.shape[1] * data.shape[2])
     # Convert from [0, 255] -> [0.0, 1.0].
-    images = images.astype(numpy.float32)
-    images = numpy.multiply(images, 1.0 / 255.0)
-    self._images = images
-    self._images[self._images < FLAGS.zero_bound] = FLAGS.zero_bound
-    self._images[self._images > FLAGS.one_bound] = FLAGS.one_bound
+    data = data.astype(numpy.float32)
+    self._data = data
     self._epochs_completed = 0
     self._index_in_epoch = 0
 
   @property
-  def images(self):
-    return self._images
+  def data(self):
+    return self._data
 
   @property
   def num_examples(self):
@@ -182,26 +120,52 @@ class DataSetPreTraining(object):
       assert batch_size <= self._num_examples
     end = self._index_in_epoch
 
-    return self._images[start:end], self._images[start:end]
+    return self._data[start:end], self._data[start:end]
 
 
-def add_lost_data():
+def add_lag(cons, thres=0.1):
+  cons = np.array(cons)
+  pa = pacf(cons, nlags=150)
+  above_thres_indices = np.argwhere(pa > 0.1)
+  above_thres_indices = np.delete(above_thres_indices, 0)
+  max_lag = max(above_thres_indices)
+  data = []
+  labels = []
+  for i in range(max_lag, len(cons) - 1):
+    new_indices = i - above_thres_indices
+    new_series = cons[new_indices]
+    data.append(new_series)
+    labels.append(cons[i])
+  return np.array(data), np.array(labels)
 
 
-def add_lag():
+def mean_filter(cons, window_size=2):
+  res = []
+  for i in range(len(cons) - window_size + 1):
+    res.append(np.array(cons[i: i+window_size]).mean())
+  return res
 
 
-def read_data_sets(train_dir, fake_data=False, one_hot=False):
+def to_30_min(cons):
+  i = 0
+  res = []
+  while i + 1 < len(cons) :
+    res.append(cons[i] + cons[i+1])
+    i += 2
+  return res
+
+def read_data_sets(train_dir='', fake_data=False, one_hot=False):
   class DataSets(object):
     pass
   data_sets = DataSets()
   train_data_name = 'building1retail.csv'
   df = pd.read_csv(train_dir + train_data_name)
 
-  df['Power (kW)'] = 
-  df = add_lost_data(df)
   electricity_cons = df['Power (kW)'].values
-  data, labels = add_lag(electricity_cons)
+  mean_filtered_cons = mean_filter(electricity_cons)
+  min30_filtered = to_30_min(mean_filtered_cons)
+  data, labels = add_lag(min30_filtered)
+  data = data.reshape(data.shape[0], data.shape[1], 1, 1)
   train_ratio = 0.7
   validation_ratio = 0.2
   test_ratio = 0.1
@@ -219,27 +183,29 @@ def read_data_sets(train_dir, fake_data=False, one_hot=False):
   return data_sets
 
 
-def read_data_sets_pretraining(train_dir):
+def read_data_sets_pretraining(train_dir=''):
   class DataSets(object):
     pass
+
   data_sets = DataSets()
+  train_data_name = 'building1retail.csv'
+  df = pd.read_csv(train_dir + train_data_name)
 
-  TRAIN_IMAGES = 'train-images-idx3-ubyte.gz'
-  TEST_IMAGES = 't10k-images-idx3-ubyte.gz'
-  VALIDATION_SIZE = 5000
+  electricity_cons = df['Power (kW)'].values
+  mean_filtered_cons = mean_filter(electricity_cons)
+  min30_filtered = to_30_min(mean_filtered_cons)
+  data, labels = add_lag(min30_filtered)
+  data = data.reshape(data.shape[0], data.shape[1], 1, 1)
+  train_ratio = 0.7
+  validation_ratio = 0.2
+  test_ratio = 0.1
+  train_data = data[:int(train_ratio * data.shape[0])]
+  validation_data = data[int(train_ratio * len(data)): int((train_ratio + validation_ratio) * len(data))]
+  test_data = data[int((1 - test_ratio) * len(data)):]
 
-  local_file = maybe_download(TRAIN_IMAGES, train_dir)
-  train_images = extract_images(local_file)
-
-  local_file = maybe_download(TEST_IMAGES, train_dir)
-  test_images = extract_images(local_file)
-
-  validation_images = train_images[:VALIDATION_SIZE]
-  train_images = train_images[VALIDATION_SIZE:]
-
-  data_sets.train = DataSetPreTraining(train_images)
-  data_sets.validation = DataSetPreTraining(validation_images)
-  data_sets.test = DataSetPreTraining(test_images)
+  data_sets.train = DataSetPreTraining(train_data)
+  data_sets.validation = DataSetPreTraining(validation_data)
+  data_sets.test = DataSetPreTraining(test_data)
 
   return data_sets
 
@@ -288,15 +254,17 @@ def fill_feed_dict(data_set, images_pl, labels_pl, noise=False):
   }
   return feed_dict
 
+
 if __name__ == '__main__':
-    # data = DataSetPreTraining(numpy.random.randn(300, 50, 50, 1) * 1000)
-    # input_ = tf.placeholder(dtype=tf.float32,
-    #                         shape=(FLAGS.batch_size, FLAGS.input_dim),
-    #                         name='ae_input_pl')
-    # target_ = tf.placeholder(dtype=tf.float32,
-    #                          shape=(FLAGS.batch_size, FLAGS.input_dim),
-    #                          name='ae_target_pl')
-    # noise = {j: getattr(FLAGS, "noise_{0}".format(j + 1))
-    #          for j in range(1)}
-    #
-    # print(fill_feed_dict_ae(data, input_, target_, noise[0]))
+    data = read_data_sets_pretraining(FLAGS.data_dir)
+    input_ = tf.placeholder(dtype=tf.float32,
+                            shape=(FLAGS.batch_size, FLAGS.input_dim),
+                            name='ae_input_pl')
+    target_ = tf.placeholder(dtype=tf.float32,
+                             shape=(FLAGS.batch_size, FLAGS.input_dim),
+                             name='ae_target_pl')
+    noise = {j: getattr(FLAGS, "noise_{0}".format(j + 1))
+             for j in range(1)}
+
+    print(fill_feed_dict_ae(data.train, input_, target_, noise[0]))
+    # print(fill_feed_dict_ae(data, input_, target_, noise[0]).values()[0].shape)

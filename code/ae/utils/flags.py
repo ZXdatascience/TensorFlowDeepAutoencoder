@@ -39,7 +39,7 @@ for i in range(num_hidden_layers):
 # Constants
 flags.DEFINE_integer('image_size', 50, 'Image square size')
 
-flags.DEFINE_integer('input_dim', 50 * 50, 'Input dimension')
+flags.DEFINE_integer('input_dim', 13, 'Input dimension')
 
 flags.DEFINE_integer('output_dim', 1, 'Output dimension')
 
@@ -66,7 +66,7 @@ flags.DEFINE_float('one_bound', 1.0 - 1.0e-9,
 flags.DEFINE_float('flush_secs', 120, 'Number of seconds to flush summaries')
 
 # Directories
-flags.DEFINE_string('data_dir', home_out('data'),
+flags.DEFINE_string('data_dir', home_out("/home/xu/Desktop/SAE/TensorFlowDeepAutoencoder/code/ae/utils/"),
                     'Directory to put the training data.')
 
 flags.DEFINE_string('summary_dir', home_out('summaries'),
