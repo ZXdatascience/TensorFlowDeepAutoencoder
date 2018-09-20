@@ -198,7 +198,7 @@ def read_data_sets(train_dir, fake_data=False, one_hot=False):
   train_data_name = 'building1retail.csv'
   df = pd.read_csv(train_dir + train_data_name)
 
-  df['Power (kW)'] =
+  df['Power (kW)'] = 
   df = add_lost_data(df)
   electricity_cons = df['Power (kW)'].values
   data, labels = add_lag(electricity_cons)
