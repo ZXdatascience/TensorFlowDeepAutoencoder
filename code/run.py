@@ -1,9 +1,9 @@
 import os
 import shutil
 
-from code.ae.utils.flags import FLAGS, home_out
-import code.ae.autoencoder as autoencoder
-from code.ae.utils.start_tensorboard import start
+from TensorFlowDeepAutoencoder.code.ae.utils.flags import FLAGS, home_out
+import TensorFlowDeepAutoencoder.code.ae.autoencoder as autoencoder
+from TensorFlowDeepAutoencoder.code.ae.utils.start_tensorboard import start
 
 
 _data_dir = FLAGS.data_dir

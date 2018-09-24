@@ -15,8 +15,8 @@ FLAGS = flags.FLAGS
 
 units_each_hidden_layer = 50
 units_each_dense_layer = 50
-num_hidden_layers = 3
-num_dense_layer = 3
+num_hidden_layers = 1
+num_dense_layer = 1
 # Autoencoder Architecture Specific Flags
 flags.DEFINE_integer("num_hidden_layers", num_hidden_layers, "Number of hidden autoencoder layers")
 flags.DEFINE_integer("num_dense_layers", num_dense_layer, "Number of dense layers")
@@ -30,7 +30,7 @@ for i in range(num_dense_layer):
                          'Number of units in dense layer {}.'.format(i+1))
 
 for i in range(num_hidden_layers):
-    flags.DEFINE_float('pre_layer{}_learning_rate'.format(i+1), 0.0001,
+    flags.DEFINE_float('pre_layer{}_learning_rate'.format(i+1), 0.01,
                        'Initial learning rate.')
 
 for i in range(num_hidden_layers):
@@ -46,14 +46,14 @@ flags.DEFINE_integer('output_dim', 1, 'Output dimension')
 flags.DEFINE_integer('seed', 1234, 'Random seed')
 
 flags.DEFINE_integer('batch_size', 30,
-                     'Batch size. Must divide evenly into the dataset sizes.')
+                     'Batch size. Must divide /evenly into the dataset sizes.')
 
 flags.DEFINE_float('supervised_learning_rate', 0.1,
                    'Supervised initial learning rate.')
 
-flags.DEFINE_integer('pretraining_epochs', 1,
+flags.DEFINE_integer('pretraining_epochs', 200,
                      "Number of training epochs for pretraining layers")
-flags.DEFINE_integer('finetuning_epochs', 56,
+flags.DEFINE_integer('finetuning_epochs', 50,
                      "Number of training epochs for "
                      "fine tuning supervised step")
 

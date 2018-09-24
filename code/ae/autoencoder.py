@@ -5,12 +5,12 @@ from os.path import join as pjoin
 
 import numpy as np
 import tensorflow as tf
-from code.ae.utils.data import fill_feed_dict_ae, read_data_sets_pretraining
-from code.ae.utils.data import read_data_sets, fill_feed_dict, DataSetPreTraining
-from code.ae.utils.flags import FLAGS
-from code.ae.utils.eval import loss_supervised, evaluation, do_eval_summary
-from code.ae.utils.utils import tile_raster_images
-from ELM.model import ELM
+from TensorFlowDeepAutoencoder.code.ae.utils.data import fill_feed_dict_ae, read_data_sets_pretraining
+from TensorFlowDeepAutoencoder.code.ae.utils.data import read_data_sets, fill_feed_dict, DataSetPreTraining
+from TensorFlowDeepAutoencoder.code.ae.utils.flags import FLAGS
+from TensorFlowDeepAutoencoder.code.ae.utils.eval import loss_supervised, evaluation, do_eval_summary
+from TensorFlowDeepAutoencoder.code.ae.utils.utils import tile_raster_images
+from TensorFlowDeepAutoencoder.ELM.model import ELM
 
 
 class AutoEncoder(object):
@@ -42,7 +42,9 @@ class AutoEncoder(object):
     self.__sess = sess
 
     self._setup_variables()
-
+    self.alpha = 0.0001
+    self.beta = 3
+    self.rho = 0.01
   @property
   def shape(self):
     return self.__shape
@@ -242,13 +244,13 @@ def training(loss, learning_rate, loss_key=None):
     for var in tf.trainable_variables():
       tf.summary.histogram(var.op.name, var)
   # Create the gradient descent optimizer with the given learning rate.
-  optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+  optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
   # Create a variable to track the global step.
   global_step = tf.Variable(0, name='global_step', trainable=False)
   # Use the optimizer to apply the gradients that minimize the loss
   # (and also increment the global step counter) as a single training step.
   train_op = optimizer.minimize(loss, global_step=global_step)
-  return train_op, global_step
+  return train_op, global_step, optimizer
 
 
 def loss_x_entropy(output, target):
@@ -262,6 +264,8 @@ def loss_x_entropy(output, target):
   Returns:
     Scalar tensor of cross entropy
   """
+  # cross_entropy = tf.reduce_mean(
+  #     -tf.reduce_sum(y_ * tf.log(tf.clip_by_value(y_predicted, 1e-10, 1.0)), reduction_indices=[1]))
   with tf.name_scope("xentropy_loss"):
       net_output_tf = tf.convert_to_tensor(output, name='input')
       target_tf = tf.convert_to_tensor(target, name='target')
@@ -274,7 +278,19 @@ def loss_x_entropy(output, target):
 
 
 def loss_rmse(output, target):
-    return tf.sqrt(tf.reduce_mean(tf.square(tf.subtract(target, output))))
+  return tf.sqrt(tf.reduce_mean(tf.square(tf.subtract(target, output))))
+
+
+def loss_mse(output, target):
+  return tf.reduce_mean(tf.square(tf.subtract(target, output)))
+
+
+def eval_mape(output, target):
+  return tf.reduce_mean(tf.abs(tf.divide(tf.subtract(output, target), target)))
+
+
+def kl_divergence(rho, rho_hat):
+  return rho * tf.log(rho) - rho * tf.log(rho_hat) + (1 - rho) * tf.log(1 - rho) - (1 - rho) * tf.log(1 - rho_hat)
 
 
 def main_unsupervised():
@@ -289,13 +305,13 @@ def main_unsupervised():
                         for j in range(num_dense)]
 
     ae = AutoEncoder(ae_hidden_shapes, ae_dense_shapes, FLAGS.input_dim, FLAGS.output_dim, sess)
-
-    data = DataSetPreTraining(np.random.randn(300, 50, 50, 1) * 1000)
-    num_train = 10
+    data = read_data_sets_pretraining(FLAGS.data_dir)
+    num_train = data.train.num_examples
 
     learning_rates = {j: getattr(FLAGS,
                                  "pre_layer{0}_learning_rate".format(j + 1))
                       for j in range(num_hidden)}
+    print(learning_rates)
 
     noise = {j: getattr(FLAGS, "noise_{0}".format(j + 1))
              for j in range(num_hidden)}
@@ -309,13 +325,19 @@ def main_unsupervised():
         target_ = tf.placeholder(dtype=tf.float32,
                                  shape=(FLAGS.batch_size, FLAGS.input_dim),
                                  name='ae_target_pl')
+
         layer = ae.pretrain_net(input_, n)
 
+        rho_hat = tf.reduce_mean(layer, axis=0)  # Average hidden layer over all data points in X, Page 14 in https://web.stanford.edu/class/cs294a/sparseAutoencoder_2011new.pdf
+        kl = kl_divergence(ae.rho, rho_hat)
         with tf.name_scope("target"):
-          target_for_loss = ae.pretrain_net(target_, n, is_target=True)
-
-        loss = loss_x_entropy(layer, target_for_loss)
-        train_op, global_step = training(loss, learning_rates[i], i)
+            target_for_loss = ae.pretrain_net(target_, n, is_target=True)
+        diff = layer - target_for_loss
+        loss = 0.5 * tf.reduce_mean(tf.reduce_sum(diff ** 2, axis=1)) \
+               + 0.5 * ae.alpha * (tf.nn.l2_loss(ae._w(n)))\
+               + ae.beta * tf.reduce_sum(kl)
+        train_op, global_step, optimizer = training(loss, learning_rates[i], i)
+        sess.run(tf.variables_initializer(optimizer.variables()))
 
         summary_dir = pjoin(FLAGS.summary_dir, 'pretraining_{0}'.format(n))
         summary_writer = tf.summary.FileWriter(summary_dir,
@@ -337,20 +359,21 @@ def main_unsupervised():
         print("|---------------|---------------|---------|----------|")
 
         for step in range(FLAGS.pretraining_epochs * num_train):
-          feed_dict = fill_feed_dict_ae(data, input_, target_, noise[i])
+          feed_dict = fill_feed_dict_ae(data.train, input_, target_, noise[i])
 
           loss_summary, loss_value = sess.run([train_op, loss],
                                               feed_dict=feed_dict)
 
-          if step % 100 == 0:
+
+          if step % 10000 == 0:
             summary_str = sess.run(summary_op, feed_dict=feed_dict)
             summary_writer.add_summary(summary_str, step)
             image_summary_op = \
                 tf.summary.image("training_images",
                                  tf.reshape(input_,
                                             (FLAGS.batch_size,
-                                             FLAGS.image_size,
-                                             FLAGS.image_size, 1)),
+                                             FLAGS.input_dim,
+                                             1, 1)),
                                  max_outputs=FLAGS.batch_size)
 
             summary_img_str = sess.run(image_summary_op,
@@ -360,22 +383,11 @@ def main_unsupervised():
             output = "| {0:>13} | {1:13.4f} | Layer {2} | Epoch {3}  |"\
                      .format(step, loss_value, n, step // num_train + 1)
 
+
+
             print(output)
+
       if i == 0:
-        filters = sess.run(tf.identity(ae["weights1"]))
-        np.save(pjoin(FLAGS.chkpt_dir, "filters"), filters)
-        filters = tile_raster_images(X=filters.T,
-                                     img_shape=(FLAGS.image_size,
-                                                FLAGS.image_size),
-                                     tile_shape=(10, 10),
-                                     output_pixel_vals=False)
-        filters = np.expand_dims(np.expand_dims(filters, 0), 3)
-        image_var = tf.Variable(filters)
-        image_filter = tf.identity(image_var)
-        sess.run(tf.variables_initializer([image_var]))
-        img_filter_summary_op = tf.summary.image("first_layer_filters",
-                                                 image_filter)
-        summary_writer.add_summary(sess.run(img_filter_summary_op))
         summary_writer.flush()
 
   return ae
@@ -389,7 +401,7 @@ def main_supervised(ae):
                               name='input_pl')
     logits = ae.supervised_net(input_pl)
 
-    data = read_data_sets()
+    data = read_data_sets(FLAGS.data_dir)
     num_train = data.train.num_examples
 
     labels_placeholder = tf.placeholder(tf.float32,
@@ -397,8 +409,9 @@ def main_supervised(ae):
                                         name='target_pl')
 
     loss = loss_rmse(logits, labels_placeholder)
-    train_op, global_step = training(loss, FLAGS.supervised_learning_rate)
-    eval_correct = loss_rmse(logits, labels_placeholder)
+    train_op, global_step, optimizer = training(loss, FLAGS.supervised_learning_rate)
+    sess.run(tf.variables_initializer(optimizer.variables()))
+    eval_error = eval_mape(logits, labels_placeholder)
 
     hist_summaries = [ae['biases{0}'.format(i + 1)]
                       for i in range(ae.num_hidden_layers + 1)]
@@ -433,7 +446,7 @@ def main_supervised(ae):
       duration = time.time() - start_time
 
       # Write the summaries and print an overview fairly often.
-      if step % 100 == 0:
+      if step % 10000 == 0:
         # Print status to stdout.
         print('Step %d: loss = %.2f (%.3f sec)' % (step, loss_value, duration))
       #   # Update the events file.
@@ -452,30 +465,21 @@ def main_supervised(ae):
       #   summary_writer.add_summary(summary_img_str)
 
       if (step + 1) % 1000 == 0 or (step + 1) == steps:
-        train_sum = do_eval_summary("training_error",
-                                    sess,
-                                    eval_correct,
-                                    input_pl,
-                                    labels_placeholder,
-                                    data.train)
+        eval_train = sess.run(eval_error, feed_dict=fill_feed_dict(data.train,
+                                                                   input_pl,
+                                                                   labels_placeholder))
+        print("training error is {}%".format(eval_train*100))
 
-        val_sum = do_eval_summary("validation_error",
-                                  sess,
-                                  eval_correct,
-                                  input_pl,
-                                  labels_placeholder,
-                                  data.validation)
+        eval_validation = sess.run(eval_error, feed_dict=fill_feed_dict(data.train,
+                                                                        input_pl,
+                                                                        labels_placeholder))
+        print("validation error is {}%".format(eval_validation * 100))
 
-        test_sum = do_eval_summary("test_error",
-                                   sess,
-                                   eval_correct,
-                                   input_pl,
-                                   labels_placeholder,
-                                   data.test)
+        eval_test = sess.run(eval_error, feed_dict=fill_feed_dict(data.test,
+                                                                  input_pl,
+                                                                  labels_placeholder))
+        print("test error is {}%".format(eval_test * 100))
 
-        summary_writer.add_summary(train_sum, step)
-        summary_writer.add_summary(val_sum, step)
-        summary_writer.add_summary(test_sum, step)
 
 if __name__ == '__main__':
   ae = main_unsupervised()

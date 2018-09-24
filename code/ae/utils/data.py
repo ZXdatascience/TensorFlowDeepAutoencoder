@@ -72,7 +72,7 @@ class DataSet(object):
       self._index_in_epoch = batch_size
       assert batch_size <= self._num_examples
     end = self._index_in_epoch
-    return self._images[start:end], self._labels[start:end]
+    return self._data[start:end], self._labels[start:end]
 
 
 class DataSetPreTraining(object):
@@ -113,7 +113,7 @@ class DataSetPreTraining(object):
       # Shuffle the data
       perm = numpy.arange(self._num_examples)
       numpy.random.shuffle(perm)
-      self._images = self._images[perm]
+      self._data = self._data[perm]
       # Start next epoch
       start = 0
       self._index_in_epoch = batch_size
@@ -169,12 +169,14 @@ def read_data_sets(train_dir='', fake_data=False, one_hot=False):
   train_ratio = 0.7
   validation_ratio = 0.2
   test_ratio = 0.1
-  train_data = data[:train_ratio * len(data)]
-  train_labels = labels[:train_ratio * len(data)]
-  validation_data = data[train_ratio * len(data): (train_ratio + validation_ratio) * len(data)]
-  validation_labels = labels[train_ratio * len(data): (train_ratio + validation_ratio) * len(data)]
-  test_data = data[(1 - test_ratio) * len(data):]
-  test_labels = labels[(1 - test_ratio) * len(data):]
+  print(data.shape)
+  print(len(data))
+  train_data = data[:int(train_ratio * data.shape[0])]
+  train_labels = labels[:int(train_ratio * len(data))]
+  validation_data = data[int(train_ratio * len(data)): int((train_ratio + validation_ratio) * len(data))]
+  validation_labels = labels[int(train_ratio * len(data)): int((train_ratio + validation_ratio) * len(data))]
+  test_data = data[int((1 - test_ratio) * len(data)):]
+  test_labels = labels[int((1 - test_ratio) * len(data)):]
 
   data_sets.train = DataSet(train_data, train_labels)
   data_sets.validation = DataSet(validation_data, validation_labels)
